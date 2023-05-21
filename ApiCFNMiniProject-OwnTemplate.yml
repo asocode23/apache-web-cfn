@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS CloudFormation Sample Template that deploys an EC2 instance while referencing 
+  variables from another stack
+
+Mappings: 
+  RegionMap: 
+    us-west-2: 
+      HVM64: "ami-04e914639d0cca79a"
+Parameters:
+  InstanceTypeParameter:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - m1.small
+      - m1.large
+    Description: Enter t2.micro, m1.small, or m1.large.
+
+  BaseTemplatefromInstructor:
+    Type: String
+    Default: SampleNetworkCrossStack
+    Description: This is to reference the base template
+
+Resources:
+  myEC2Instance: 
+    Type: "AWS::EC2::Instance"
+    Properties: 
+      InstanceType: !Ref InstanceTypeParameter
+      ImageId: !FindInMap [ RegionMap, us-west-2, HVM64 ]
+      NetworkInterfaces:
+        - GroupSet:
+            - Fn::ImportValue: 
+                !Sub "${BaseTemplatefromInstructor}-SecurityGroupID"
+          AssociatePublicIpAddress: 'true'
+          DeviceIndex: '0'
+          DeleteOnTermination: 'true'
+          SubnetId: 
+            Fn::ImportValue: !Sub "${BaseTemplatefromInstructor}-SubnetID"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -ysu
+          yum install -y httpd.x86_64
+          systemctl start httpd.service
+          systemctl enable httpd.service
+          echo "
+          <html>
+          <head>
+          <title>AWS CloudFormation</title>
+          </head>
+          <body bgcolor=#f1f1f1 text=Purple>
+          <h1>AWS CloudFormation is an AWS service, a language that allows you to describe your infrastructure as a code.</h1>
+          <h1>It helps you create your infrastructure in the right order with just a few clicks.</h1>
+          <h1>It does require dedication to master it and enjoy it to the fullest!</h1>
+          </body>
+          </html>
+          " > /var/www/html/index.html     
+
+
+  myEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref myEC2Instance
+
+
+Outputs:
+  MyEC2PrivateIP:
+    Description: To return the IP address of my EC2
+    Value: !GetAtt myEC2Instance.PublicIp
+  MyEC2DNSName:
+    Description: To return the DNS name of my EC2
+    Value: !GetAtt myEC2Instance.PublicDnsName
